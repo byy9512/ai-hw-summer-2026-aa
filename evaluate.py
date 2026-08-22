@@ -25,12 +25,12 @@ def load_model(arch_key: str, ckpt_name: str, device: torch.device) -> Normalize
 
 
 def evaluate(model: NormalizedModel, test_loader, device: torch.device, attack_fn, epsilons: list[float]) -> dict:
-    """Returns clean accuracy and, for each epsilon, the attack success rate (ASR) —
+    """Returns recognition rate and, for each epsilon, the attack success rate (ASR) —
     the fraction of originally-correctly-classified test images the attack flips to wrong.
     Images the model already misclassifies are excluded from the ASR denominator, since
     "fooling" an already-wrong prediction isn't a meaningful attack success.
     """
-    clean_correct = 0
+    correct = 0
     total = 0
     post_attack_correct = {eps: 0 for eps in epsilons}
     attacked_count = {eps: 0 for eps in epsilons}
@@ -39,9 +39,9 @@ def evaluate(model: NormalizedModel, test_loader, device: torch.device, attack_f
         images, labels = images.to(device), labels.to(device)
 
         with torch.no_grad():
-            clean_preds = model(images).argmax(dim=1)
-        correct_mask = clean_preds == labels
-        clean_correct += correct_mask.sum().item()
+            preds = model(images).argmax(dim=1)
+        correct_mask = preds == labels
+        correct += correct_mask.sum().item()
         total += labels.size(0)
 
         if correct_mask.sum().item() == 0:
@@ -57,7 +57,7 @@ def evaluate(model: NormalizedModel, test_loader, device: torch.device, attack_f
             post_attack_correct[eps] += (adv_preds == target_labels).sum().item()
             attacked_count[eps] += target_labels.size(0)
 
-    results = {"clean_accuracy": 100 * clean_correct / total}
+    results = {"recognition_rate": 100 * correct / total}
     for eps in epsilons:
         asr = 100 * (1 - post_attack_correct[eps] / attacked_count[eps])
         results[eps] = asr
@@ -82,7 +82,7 @@ def main():
     results = evaluate(model, test_loader, device, ATTACKS[args.attack], args.epsilons)
 
     print(f"\n{args.checkpoint} ({args.attack})")
-    print(f"  clean accuracy: {results['clean_accuracy']:.2f}%")
+    print(f"  recognition rate: {results['recognition_rate']:.2f}%")
     for eps in args.epsilons:
         print(f"  epsilon={eps:.2f}  ASR={results[eps]:.2f}%")
 
