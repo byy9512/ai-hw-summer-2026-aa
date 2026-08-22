@@ -42,3 +42,43 @@ def fgsm_attack(model: nn.Module, images: torch.Tensor, labels: torch.Tensor, ep
 
     perturbed = images + epsilon * images.grad.sign()
     return perturbed.clamp(0, 1).detach()
+
+
+def ifgsm_attack(
+    model: nn.Module,
+    images: torch.Tensor,
+    labels: torch.Tensor,
+    epsilon: float,
+    alpha: float = 0.01,
+    num_iter: int = 40,
+    random_start: bool = False,
+) -> torch.Tensor:
+    """Iterative FGSM (Kurakin et al., 2017) / Projected Gradient Descent (Madry et al., 2018).
+
+    Repeats small FGSM steps, projecting back into the L-infinity epsilon-ball around the
+    original image after each step (and clamping to valid pixel range). PGD is this same
+    procedure starting from a random point inside that ball (random_start=True); I-FGSM
+    starts exactly at the original image (random_start=False) — otherwise identical.
+    """
+    original = images.clone().detach()
+
+    if random_start:
+        perturbed = original + torch.empty_like(original).uniform_(-epsilon, epsilon)
+        perturbed = perturbed.clamp(0, 1).detach()
+    else:
+        perturbed = original.clone().detach()
+
+    for _ in range(num_iter):
+        perturbed.requires_grad_(True)
+        outputs = model(perturbed)
+        loss = F.cross_entropy(outputs, labels)
+        model.zero_grad()
+        loss.backward()
+
+        with torch.no_grad():
+            perturbed = perturbed + alpha * perturbed.grad.sign()
+            perturbation = (perturbed - original).clamp(-epsilon, epsilon)
+            perturbed = (original + perturbation).clamp(0, 1)
+        perturbed = perturbed.detach()
+
+    return perturbed
