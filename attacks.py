@@ -82,3 +82,44 @@ def ifgsm_attack(
         perturbed = perturbed.detach()
 
     return perturbed
+
+
+def mifgsm_attack(
+    model: nn.Module,
+    images: torch.Tensor,
+    labels: torch.Tensor,
+    epsilon: float,
+    alpha: float = 0.01,
+    num_iter: int = 40,
+    mu: float = 1.0,
+) -> torch.Tensor:
+    """Momentum Iterative FGSM (Dong et al., 2018).
+
+    Same iterative structure as I-FGSM, but accumulates a momentum term over the
+    (L1-normalized) gradient direction at each step before taking the sign step.
+    Momentum stabilizes the update direction and helps escape poor local maxima of
+    the loss surface. Uses the same alpha/num_iter as ifgsm_attack so momentum is
+    the only variable being tested between the two.
+    """
+    original = images.clone().detach()
+    perturbed = original.clone().detach()
+    momentum = torch.zeros_like(original)
+
+    for _ in range(num_iter):
+        perturbed.requires_grad_(True)
+        outputs = model(perturbed)
+        loss = F.cross_entropy(outputs, labels)
+        model.zero_grad()
+        loss.backward()
+
+        grad = perturbed.grad
+        grad_norm = grad.abs().sum(dim=(1, 2, 3), keepdim=True).clamp(min=1e-12)
+        momentum = mu * momentum + grad / grad_norm
+
+        with torch.no_grad():
+            perturbed = perturbed + alpha * momentum.sign()
+            perturbation = (perturbed - original).clamp(-epsilon, epsilon)
+            perturbed = (original + perturbation).clamp(0, 1)
+        perturbed = perturbed.detach()
+
+    return perturbed

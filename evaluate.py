@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 
-from attacks import NormalizedModel, fgsm_attack, get_device, ifgsm_attack
+from attacks import NormalizedModel, fgsm_attack, get_device, ifgsm_attack, mifgsm_attack
 from data import get_raw_test_loader
 from registry import CHECKPOINTS, MODEL_REGISTRY
 
@@ -13,6 +13,7 @@ ATTACKS = {
     "fgsm": fgsm_attack,
     "ifgsm": lambda model, images, labels, epsilon: ifgsm_attack(model, images, labels, epsilon, random_start=False),
     "pgd": lambda model, images, labels, epsilon: ifgsm_attack(model, images, labels, epsilon, random_start=True),
+    "mifgsm": mifgsm_attack,
 }
 
 
