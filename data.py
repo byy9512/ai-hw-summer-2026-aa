@@ -37,3 +37,14 @@ def get_dataloaders(data_dir: str = "./data", batch_size: int = 128, num_workers
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     return train_loader, test_loader
+
+
+def get_raw_test_loader(data_dir: str = "./data", batch_size: int = 128, num_workers: int = 2):
+    """Returns a DataLoader over the MNIST test split in raw [0, 1] pixel space (no normalization).
+
+    Adversarial attacks perturb and clip images in the model's actual input range, so
+    attacks are crafted here and the target model is wrapped (see attacks.NormalizedModel)
+    to apply normalization internally rather than normalizing the data up front.
+    """
+    test_set = datasets.MNIST(root=data_dir, train=False, download=True, transform=transforms.ToTensor())
+    return DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
